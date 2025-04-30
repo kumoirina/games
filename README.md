@@ -12,3 +12,6 @@ he is global famous.
 - nkacajbkkjhvjhdjasvsdnlbdsjvahnnsakasb
 - Frau  Zhang ist eine ai Lehrerin
 - Ich spreche Deutsch fuer sehr lange Zeit
+---
+4月30号
+改从下往上穿模，改平台间距 改稍宽一点点，改两个相邻的平台方块会自动上移
