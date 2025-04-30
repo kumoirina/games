@@ -1,5 +1,6 @@
 import pygame
 import sys
+import random
 
 # Initialize Pygame
 pygame.init()
@@ -8,8 +9,9 @@ pygame.init()
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 FPS = 60
 GRAVITY = 0.5
-JUMP_STRENGTH = -10
+JUMP_STRENGTH = -15
 PLAYER_SPEED = 5
+PLATFORM_SPACING = 300  # 平台之间的间距
 
 # Colors
 WHITE = (255, 255, 255)
@@ -33,14 +35,19 @@ class Player(pygame.sprite.Sprite):
         self.rect.center = (100, SCREEN_HEIGHT - 100)
         self.vel_y = 0
         self.on_ground = False
+        self.jump_count = 0  # 追踪跳跃次数
+        self.world_x = self.rect.x  # 添加世界坐标
 
     def update(self, platforms):
         # Horizontal movement
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT]:
-            self.rect.x -= PLAYER_SPEED
+            self.world_x -= PLAYER_SPEED
         if keys[pygame.K_RIGHT]:
-            self.rect.x += PLAYER_SPEED
+            self.world_x += PLAYER_SPEED
+        
+        # 更新实际位置
+        self.rect.x = self.world_x - camera_offset
 
         # Vertical movement (gravity)
         self.vel_y += GRAVITY
@@ -53,10 +60,15 @@ class Player(pygame.sprite.Sprite):
                 self.rect.bottom = platform.rect.top
                 self.vel_y = 0
                 self.on_ground = True
+                self.jump_count = 0  # 落地时重置跳跃次数
 
-        # Jumping
-        if keys[pygame.K_SPACE] and self.on_ground:
-            self.vel_y = JUMP_STRENGTH
+        # Jumping with double jump
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_SPACE]:
+            if self.on_ground or self.jump_count < 2:  # 允许最多跳两次（一段跳+二段跳）
+                self.vel_y = JUMP_STRENGTH
+                self.jump_count += 1
+                self.on_ground = False
 
 # Platform class
 class Platform(pygame.sprite.Sprite):
@@ -66,6 +78,41 @@ class Platform(pygame.sprite.Sprite):
         self.image.fill(GREEN)
         self.rect = self.image.get_rect()
         self.rect.topleft = (x, y)
+        self.world_x = x  # 添加世界坐标
+
+class PlatformGenerator:
+    def __init__(self):
+        self.last_platform_x = 600
+        # 创建初始地面
+        self.create_initial_ground()
+    
+    def create_initial_ground(self):
+        # 创建连续的地面
+        for x in range(0, SCREEN_WIDTH * 2, SCREEN_WIDTH):
+            ground = Platform(x, SCREEN_HEIGHT - 20, SCREEN_WIDTH, 20)
+            platforms.add(ground)
+            all_sprites.add(ground)
+            self.last_platform_x = max(self.last_platform_x, x + SCREEN_WIDTH)
+
+    def generate_platforms(self, camera_offset):
+        # 当最后一个平台距离屏幕右边缘不足一个屏幕宽度时，生成新平台
+        while self.last_platform_x - camera_offset < SCREEN_WIDTH + 400:
+            # 生成新的地面段
+            ground = Platform(self.last_platform_x, SCREEN_HEIGHT - 20, SCREEN_WIDTH, 20)
+            platforms.add(ground)
+            all_sprites.add(ground)
+            
+            # 生成跳跃平台
+            platform_width = 150
+            platform_height = 20
+            platform_y = random.randint(250, 450)
+            
+            new_platform = Platform(self.last_platform_x + random.randint(0, 200), 
+                                 platform_y, platform_width, platform_height)
+            platforms.add(new_platform)
+            all_sprites.add(new_platform)
+            
+            self.last_platform_x += SCREEN_WIDTH
 
 # Create groups
 all_sprites = pygame.sprite.Group()
@@ -75,13 +122,9 @@ platforms = pygame.sprite.Group()
 player = Player()
 all_sprites.add(player)
 
-# Create platforms
-ground = Platform(0, SCREEN_HEIGHT - 20, SCREEN_WIDTH, 20)
-platform1 = Platform(200, 400, 150, 20)
-platform2 = Platform(450, 300, 150, 20)
-
-platforms.add(ground, platform1, platform2)
-all_sprites.add(ground, platform1, platform2)
+# 创建平台生成器并初始化相机偏移量
+platform_generator = PlatformGenerator()
+camera_offset = 0
 
 # Game loop
 running = True
@@ -89,6 +132,24 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+    
+    # 更新相机位置（修改为更平滑的跟随）
+    target_offset = max(0, player.world_x - SCREEN_WIDTH // 3)
+    camera_offset += (target_offset - camera_offset) * 0.1
+
+    # 生成新平台
+    platform_generator.generate_platforms(camera_offset)
+
+    # 删除已经离开屏幕的平台（保留地面）
+    for platform in platforms:
+        if platform.rect.height != 20:  # 不是地面才删除
+            if platform.rect.right - camera_offset < -100:
+                platform.kill()
+
+    # 更新所有sprite的位置
+    for sprite in all_sprites:
+        if sprite != player:
+            sprite.rect.x = sprite.world_x - camera_offset
 
     # Update
     all_sprites.update(platforms)
