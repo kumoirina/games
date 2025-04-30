@@ -9,9 +9,12 @@ pygame.init()
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 FPS = 60
 GRAVITY = 0.5
-JUMP_STRENGTH = -15
+JUMP_STRENGTH = -13
 PLAYER_SPEED = 5
-PLATFORM_SPACING = 300  # 平台之间的间距
+PLATFORM_SPACING = 200
+MAX_JUMP_HEIGHT = abs((JUMP_STRENGTH * JUMP_STRENGTH) / (2 * GRAVITY))
+MIN_HEIGHT_INCREASE = 30  # 最小高度增加
+MAX_HEIGHT_INCREASE = MAX_JUMP_HEIGHT - 20  # 最大高度增加，比最大跳跃高度小一点
 
 # Colors
 WHITE = (255, 255, 255)
@@ -83,7 +86,7 @@ class Platform(pygame.sprite.Sprite):
 class PlatformGenerator:
     def __init__(self):
         self.last_platform_x = 600
-        # 创建初始地面
+        self.last_platform_y = SCREEN_HEIGHT - 200  # 初始平台高度
         self.create_initial_ground()
     
     def create_initial_ground(self):
@@ -95,7 +98,6 @@ class PlatformGenerator:
             self.last_platform_x = max(self.last_platform_x, x + SCREEN_WIDTH)
 
     def generate_platforms(self, camera_offset):
-        # 当最后一个平台距离屏幕右边缘不足一个屏幕宽度时，生成新平台
         while self.last_platform_x - camera_offset < SCREEN_WIDTH + 400:
             # 生成新的地面段
             ground = Platform(self.last_platform_x, SCREEN_HEIGHT - 20, SCREEN_WIDTH, 20)
@@ -105,14 +107,25 @@ class PlatformGenerator:
             # 生成跳跃平台
             platform_width = 150
             platform_height = 20
-            platform_y = random.randint(250, 450)
             
-            new_platform = Platform(self.last_platform_x + random.randint(0, 200), 
-                                 platform_y, platform_width, platform_height)
+            # 计算新平台的高度（比前一个平台更高）
+            height_increase = random.randint(MIN_HEIGHT_INCREASE, int(MAX_HEIGHT_INCREASE))
+            platform_y = self.last_platform_y - height_increase  # 减少y值使平台升高
+            
+            # 确保平台不会太高
+            if platform_y < 100:  # 设置最高限制
+                platform_y = SCREEN_HEIGHT - 200  # 重置到较低位置
+            
+            # 生成新平台
+            platform_x = self.last_platform_x + random.randint(150, 200)  # 缩小水平间距范围
+            new_platform = Platform(platform_x, platform_y, platform_width, platform_height)
+            
             platforms.add(new_platform)
             all_sprites.add(new_platform)
             
-            self.last_platform_x += SCREEN_WIDTH
+            # 更新最后一个平台的信息
+            self.last_platform_x = platform_x
+            self.last_platform_y = platform_y
 
 # Create groups
 all_sprites = pygame.sprite.Group()
