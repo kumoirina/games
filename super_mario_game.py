@@ -52,6 +52,9 @@ class Player(pygame.sprite.Sprite):
         # 更新实际位置
         self.rect.x = self.world_x - camera_offset
 
+        # 存储原始Y位置用于碰撞检测
+        original_y = self.rect.y
+        
         # Vertical movement (gravity)
         self.vel_y += GRAVITY
         self.rect.y += self.vel_y
@@ -59,16 +62,22 @@ class Player(pygame.sprite.Sprite):
         # Collision detection
         self.on_ground = False
         for platform in platforms:
-            if self.rect.colliderect(platform.rect) and self.vel_y > 0:
-                self.rect.bottom = platform.rect.top
-                self.vel_y = 0
-                self.on_ground = True
-                self.jump_count = 0  # 落地时重置跳跃次数
+            if self.rect.colliderect(platform.rect):
+                # 从上方碰撞
+                if original_y + self.rect.height <= platform.rect.top and self.vel_y > 0:
+                    self.rect.bottom = platform.rect.top
+                    self.vel_y = 0
+                    self.on_ground = True
+                    self.jump_count = 0
+                # 从下方碰撞
+                elif original_y >= platform.rect.bottom and self.vel_y < 0:
+                    self.rect.top = platform.rect.bottom
+                    self.vel_y = 0
 
         # Jumping with double jump
         keys = pygame.key.get_pressed()
         if keys[pygame.K_SPACE]:
-            if self.on_ground or self.jump_count < 2:  # 允许最多跳两次（一段跳+二段跳）
+            if self.on_ground or self.jump_count < 2:
                 self.vel_y = JUMP_STRENGTH
                 self.jump_count += 1
                 self.on_ground = False
